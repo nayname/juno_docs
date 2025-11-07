@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "website": "scripts/sidebar-test.js"
+  }
+}
