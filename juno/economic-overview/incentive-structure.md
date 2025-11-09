@@ -7,10 +7,6 @@ coverY: 260
 
 ### Reward Schedule <a href="#id-8ab1" id="id-8ab1"></a>
 
-{% hint style="info" %}
-The Juno rewards model distributes a fixed amount of $juno per block, which is calculated by the network and depends on the inflation rate as well as network block time. Variation in the network block time will cause variation in the calculable annual percentage rate (APR).
-{% endhint %}
-
 ⚪️ **Phase 1**: Fixed inflation 40%
 
 New Juno in year 1 = (+25.961.297)

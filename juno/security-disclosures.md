@@ -8,10 +8,6 @@ coverY: 261
 
 # Security Disclosures
 
-{% hint style="danger" %}
-If you have a vulnerability or critical issue to disclose, follow responsible disclosure practice and do not speak publicly about it. If it affects other CosmWasm chains, then notify them as well. Typically, chains maintain a `SECURITY.md` document alongside their source code with instructions for notifying the team.
-{% endhint %}
-
 Juno's [SECURITY.md file can be found here](https://github.com/CosmosContracts/juno/blob/main/SECURITY.md), and is reproduced below:
 
 ## Juno bug reporting

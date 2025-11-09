@@ -4,6 +4,37 @@
     let expanded = false;
     let firstAssistantShown = false;
 
+      async function sendToBackend(userText) {
+          try {
+              const response = await fetch("https://api.thousandmonkeystypewriter.org/chat", {
+                  method: "POST", headers: {
+                      "Content-Type": "application/json",
+                  }, body: JSON.stringify({query: userText}),
+              });
+
+              if (!response.ok) {
+                  throw new Error("Bad backend response: " + response.status);
+              }
+
+              return await response.json();
+          } catch (err) {
+              console.error("Backend error:", err);
+              return {
+                  mode: "error", message: "❌ Error contacting backend: " + err.message,
+              };
+          }
+
+          // return {
+          //     "mode": "mixed",
+          //     "answer": "this is a test answer",
+          //     "workflow": {
+          //         "steps": [
+          //             {"title": "✅ Mock execution complete.\nTx: mock_tx_ABC123"},
+          //             {"title": "🔄 Running mock execution…"}
+          //         ]
+          //     }
+          // }
+      }
     // -------- COLLAPSED CHAT STRING --------
     const chatString = document.createElement("div");
     chatString.id = "chat-string";
@@ -206,7 +237,8 @@
     sidebar.appendChild(footer);
     document.body.appendChild(sidebar);
 
-    // -------- FUNCTIONS --------
+
+    // ========= expand/collapse =========
     const expandSidebar = () => {
       expanded = true;
       sidebar.style.transform = "translateX(0)";
@@ -225,7 +257,10 @@
 
     input.addEventListener("focus", expandSidebar);
     icon.addEventListener("click", expandSidebar);
+    chatString.addEventListener("click", () => input.focus());
 
+
+    // ========= message utility ===========
     const addMsg = (role, text) => {
       const msg = document.createElement("div");
       msg.textContent = text;
@@ -248,141 +283,160 @@
       chatArea.scrollTop = chatArea.scrollHeight;
     };
 
-    const addWorkflowDetails = () => {
-      const details = document.createElement("details");
-      details.open = false;
-      Object.assign(details.style, {
-        background: "#f9fafb",
-        border: "1px solid #e2e8f0",
-        borderRadius: "8px",
-        padding: "8px",
-        margin: "6px 6px 10px 6px",
-        fontSize: "12px",
-        color: "#4a5568",
-      });
+      // ========= workflow preview ===========
+      const renderWorkflow = (workflowObj) => {
+          const box = document.createElement("div");
+          Object.assign(box.style, {
+              background: "#f9fafb",
+              border: "1px solid #e2e8f0",
+              borderRadius: "8px",
+              padding: "10px",
+              margin: "6px 6px 10px 6px",
+              fontSize: "12px",
+              color: "#4a5568",
+          });
 
-      const summary = document.createElement("summary");
-      summary.textContent = "View Workflow Details";
-      Object.assign(summary.style, {
-        cursor: "pointer",
-        color: "#2b6cb0",
-        fontWeight: "600",
-        padding: "4px",
-      });
-      details.appendChild(summary);
+          box.innerHTML = `<div style="font-weight:600;margin-bottom:6px">Workflow Preview</div>`;
 
-      const container = document.createElement("div");
-      container.style.padding = "6px";
+          if (Array.isArray(workflowObj.steps)) {
+              const stepsList = document.createElement("ul");
+              Object.assign(stepsList.style, {
+                  marginBottom: "8px",
+                  lineHeight: "1.4",
+              });
 
-      // Execution Level row
-      const levelLabel = document.createElement("p");
-      levelLabel.textContent = "Execution Level:";
-      Object.assign(levelLabel.style, {
-        margin: "4px 0 4px",
-        fontWeight: "600",
-        color: "#2d3748",
-      });
+              workflowObj.steps.forEach((s) => {
+                  const li = document.createElement("li");
+                  li.textContent = s.title || s.name || "Step";
+                  stepsList.appendChild(li);
+              });
+              box.appendChild(stepsList);
+          }
 
-      const levelSelect = document.createElement("select");
-      Object.assign(levelSelect.style, {
-        border: "1px solid #cbd5e0",
-        borderRadius: "6px",
-        padding: "4px 6px",
-        fontSize: "12px",
-        background: "#f8fafc",
-      });
-      ["Mock", "Read-only", "Testnet", "Mainnet"].forEach((opt) => {
-        const o = document.createElement("option");
-        o.text = opt;
-        levelSelect.add(o);
-      });
+          // Execution level
+          const levelRow = document.createElement("div");
+          levelRow.innerHTML = `<p style="font-weight:600;margin:4px 0 4px">Execution Level:</p>`;
 
-      // Steps blocks
-      const makeStep = (title, content, dark = false) => {
-        const t = document.createElement("p");
-        t.textContent = title;
-        Object.assign(t.style, {
-          margin: "8px 0 4px",
-          fontWeight: "600",
-          color: "#4a5568",
-        });
-        const pre = document.createElement("pre");
-        pre.textContent = content;
-        Object.assign(pre.style, {
-          margin: "0 0 6px 0",
-          padding: "8px",
-          borderRadius: "6px",
-          overflowX: "auto",
-          whiteSpace: "pre-wrap",
-          background: dark ? "#1a202c" : "#f3f4f6",
-          color: dark ? "#f7fafc" : "#111827",
-        });
-        container.appendChild(t);
-        container.appendChild(pre);
+          const levelSelect = document.createElement("select");
+          ["Mock", "Read-only", "Testnet", "Mainnet"].forEach((opt) => {
+              const o = document.createElement("option");
+              o.value = opt.toLowerCase();
+              o.text = opt;
+              levelSelect.add(o);
+          });
+          Object.assign(levelSelect.style, {
+              border: "1px solid #cbd5e0",
+              borderRadius: "6px",
+              padding: "4px 6px",
+              fontSize: "12px",
+              background: "#f8fafc",
+          });
+          levelRow.appendChild(levelSelect);
+          box.appendChild(levelRow);
+
+          // Buttons
+          const btnRow = document.createElement("div");
+          Object.assign(btnRow.style, {
+              display: "flex",
+              gap: "8px",
+              marginTop: "8px",
+          });
+
+          const mockBtn = document.createElement("button");
+          mockBtn.textContent = "Mock Execute";
+          Object.assign(mockBtn.style, {
+              flex: "1",
+              padding: "6px",
+              background: "#2f855a",
+              color: "#fff",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+          });
+          mockBtn.onclick = () => {
+              addMsg("assistant", "🔄 Running mock execution…");
+              setTimeout(() => {
+                  addMsg("assistant", "✅ Mock execution complete.\nTx: mock_tx_ABC123");
+              }, 600);
+          };
+
+          const playBtn = document.createElement("button");
+          playBtn.textContent = "Open Playground";
+          Object.assign(playBtn.style, {
+              flex: "1",
+              padding: "6px",
+              background: "#3b82f6",
+              color: "#fff",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+          });
+          playBtn.onclick = () => window.location.href = "/playground.html";
+
+          btnRow.appendChild(mockBtn);
+          btnRow.appendChild(playBtn);
+          box.appendChild(btnRow);
+
+          chatArea.appendChild(box);
+          chatArea.scrollTop = chatArea.scrollHeight;
       };
 
-      container.appendChild(levelLabel);
-      container.appendChild(levelSelect);
+      // ========= main submit ===========
+      footer.onsubmit = async (e) => {
+          e.preventDefault();
+          const text = footerInput.value.trim();
+          if (!text) return;
+          footerInput.value = "";
 
-      makeStep(
-        "Step 1: Collect Input Parameters",
-        "> Gathering user inputs and validating schema...\n✅ Input validated successfully.",
-        true
-      );
+          if (placeholder.parentNode) placeholder.parentNode.removeChild(placeholder);
 
-      makeStep(
-        "Step 2: Generate Execution Plan",
-        `{
-  "action": "execute",
-  "target": "cosmwasm_contract",
-  "parameters": {
-    "amount": "3 eBTC",
-    "destination": "vault"
-  }
-}`
-      );
+          addMsg("user", text);
 
-      makeStep(
-        "Step 3: Mock Execution Output",
-        "> Simulating transaction...\n✔️ Response: success\nTx hash: mock_tx_ABC123",
-        true
-      );
+          // Show "thinking" placeholder
+          const thinking = document.createElement("div");
+          thinking.textContent = "Thinking…";
+          Object.assign(thinking.style, {
+              padding: "8px 10px",
+              borderRadius: "10px",
+              background: "#f3f4f6",
+              maxWidth: "90%",
+              fontSize: "13px",
+          });
+          chatArea.appendChild(thinking);
 
-      details.appendChild(container);
-      chatArea.appendChild(details);
-      chatArea.scrollTop = chatArea.scrollHeight;
-    };
+          const result = await sendToBackend(text);
 
-    // Submit flow
-    footer.onsubmit = (e) => {
-      e.preventDefault();
-      const val = footerInput.value.trim();
-      if (!val) return;
-      if (placeholder.parentNode) placeholder.parentNode.removeChild(placeholder);
-      addMsg("user", val);
-      footerInput.value = "";
-      setTimeout(() => {
-        addMsg(
-          "assistant",
-          "Mock execution complete ✅\nTx hash: mock_tx_ABC123\n(Details below)"
-        );
-        if (!firstAssistantShown) {
-          addWorkflowDetails();
-          firstAssistantShown = true;
-          // Once assistant responded, we can keep or hide suggestions:
-          // suggestionsWrap.style.display = "none"; // uncomment to hide
-        } else {
-          addWorkflowDetails();
-        }
-      }, 650);
-    };
+          thinking.remove();
 
-    // Mount sidebar
-    document.body.appendChild(sidebar);
+          // ===== Branching logic =====
+          if (result.mode === "error") {
+              addMsg("assistant", result.message);
+              return;
+          }
 
-    // Start expanded if user focuses/clicks
-    input.addEventListener("focus", expandSidebar);
-    icon.addEventListener("click", expandSidebar);
-    chatString.addEventListener("click", () => input.focus());
+          if (result.mode === "answer") {
+              addMsg("assistant", result.answer);
+              return;
+          }
+
+          if (result.mode === "workflow") {
+              addMsg("assistant", "⚙️ Executable workflow detected:");
+              renderWorkflow(result.workflow);
+              return;
+          }
+
+          if (result.mode === "mixed") {
+              if (result.answer) addMsg("assistant", result.answer);
+              if (result.workflow) {
+                  addMsg("assistant", "⚙️ Execution plan:");
+                  renderWorkflow(result.workflow);
+              }
+              return;
+          }
+
+          // fallback
+          addMsg("assistant", "❓ Unexpected backend format.");
+      };
   });
 })();
+
