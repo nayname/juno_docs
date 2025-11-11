@@ -261,123 +261,173 @@
 
 
     // ========= message utility ===========
-    const addMsg = (role, text) => {
-      const msg = document.createElement("div");
-      msg.textContent = text;
-      Object.assign(msg.style, {
-        marginBottom: "6px",
-        maxWidth: "90%",
-        padding: "8px 10px",
-        borderRadius: "10px",
-        whiteSpace: "pre-wrap",
-        wordWrap: "break-word",
-        fontSize: "13px",
-      });
-      if (role === "user") {
-        msg.style.background = "#dcfce7";
-        msg.style.marginLeft = "auto";
-      } else {
-        msg.style.background = "#edf2f7";
-      }
-      chatArea.appendChild(msg);
-      chatArea.scrollTop = chatArea.scrollHeight;
-    };
+      const addMsg = (role, htmlText) => {
+          const msg = document.createElement("div");
+
+          // 👇 CRITICAL FIX — RENDER HTML
+          msg.innerHTML = htmlText;
+
+          Object.assign(msg.style, {
+              marginBottom: "6px",
+              maxWidth: "90%",
+              padding: "8px 10px",
+              borderRadius: "10px",
+              fontSize: "13px",
+              whiteSpace: "normal",     // allow HTML wrapping
+              wordBreak: "break-word",
+          });
+
+          if (role === "user") {
+              msg.style.background = "#dcfce7";
+              msg.style.marginLeft = "auto";
+          } else {
+              msg.style.background = "#edf2f7";
+          }
+
+          chatArea.appendChild(msg);
+          chatArea.scrollTop = chatArea.scrollHeight;
+      };
 
       // ========= workflow preview ===========
-      const renderWorkflow = (workflowObj) => {
-          const box = document.createElement("div");
-          Object.assign(box.style, {
+      const renderWorkflow = (workflowArray, recipeTitle) => {
+          const container = document.createElement("div");
+          Object.assign(container.style, {
               background: "#f9fafb",
               border: "1px solid #e2e8f0",
               borderRadius: "8px",
-              padding: "10px",
+              padding: "12px",
               margin: "6px 6px 10px 6px",
               fontSize: "12px",
-              color: "#4a5568",
+              color: "#374151",
           });
 
-          box.innerHTML = `<div style="font-weight:600;margin-bottom:6px">Workflow Preview</div>`;
-
-          if (Array.isArray(workflowObj.steps)) {
-              const stepsList = document.createElement("ul");
-              Object.assign(stepsList.style, {
-                  marginBottom: "8px",
-                  lineHeight: "1.4",
+          // Recipe title
+          if (recipeTitle) {
+              const title = document.createElement("div");
+              title.textContent = recipeTitle;
+              Object.assign(title.style, {
+                  fontWeight: "600",
+                  fontSize: "14px",
+                  marginBottom: "6px"
               });
-
-              workflowObj.steps.forEach((s) => {
-                  const li = document.createElement("li");
-                  li.textContent = s.title || s.name || "Step";
-                  stepsList.appendChild(li);
-              });
-              box.appendChild(stepsList);
+              container.appendChild(title);
           }
 
-          // Execution level
-          const levelRow = document.createElement("div");
-          levelRow.innerHTML = `<p style="font-weight:600;margin:4px 0 4px">Execution Level:</p>`;
+          // Steps
+          workflowArray.forEach((step, idx) => {
+              const stepBox = document.createElement("details");
+              stepBox.style.marginBottom = "6px";
 
-          const levelSelect = document.createElement("select");
-          ["Mock", "Read-only", "Testnet", "Mainnet"].forEach((opt) => {
+              const summary = document.createElement("summary");
+              summary.textContent = `Step ${idx + 1}: ${step.tool || "Unnamed tool"}`;
+              Object.assign(summary.style, {
+                  cursor: "pointer",
+                  fontWeight: "600",
+                  color: "#2b6cb0"
+              });
+
+              stepBox.appendChild(summary);
+
+              const inner = document.createElement("div");
+              inner.style.padding = "6px 0";
+
+              // Description
+              if (step.description) {
+                  const desc = document.createElement("p");
+                  desc.textContent = step.description;
+                  Object.assign(desc.style, {
+                      marginBottom: "4px",
+                      fontSize: "12px"
+                  });
+                  inner.appendChild(desc);
+              }
+
+              // Type / function metadata
+              if (step.type || step.function) {
+                  const meta = document.createElement("p");
+                  meta.style.fontSize = "12px";
+                  meta.style.color = "#6b7280";
+                  meta.textContent = `${step.type || ""} ${step.function ? "• " + step.function : ""}`;
+                  inner.appendChild(meta);
+              }
+
+              // Code block
+              if (step.code) {
+                  const codeBlock = document.createElement("pre");
+                  codeBlock.textContent = step.code;
+                  Object.assign(codeBlock.style, {
+                      background: "#1a202c",
+                      color: "#f7fafc",
+                      padding: "8px",
+                      borderRadius: "6px",
+                      whiteSpace: "pre-wrap",
+                      overflowX: "auto",
+                      fontSize: "11px"
+                  });
+                  inner.appendChild(codeBlock);
+              }
+
+              stepBox.appendChild(inner);
+              container.appendChild(stepBox);
+          });
+
+          // Execution Level + Buttons
+          const controls = document.createElement("div");
+          Object.assign(controls.style, {
+              marginTop: "10px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "6px"
+          });
+
+          // Level Dropdown
+          const select = document.createElement("select");
+          ["Mock", "Read-only", "Testnet", "Mainnet"].forEach(opt => {
               const o = document.createElement("option");
               o.value = opt.toLowerCase();
               o.text = opt;
-              levelSelect.add(o);
+              select.add(o);
           });
-          Object.assign(levelSelect.style, {
+          Object.assign(select.style, {
               border: "1px solid #cbd5e0",
+              padding: "6px",
               borderRadius: "6px",
-              padding: "4px 6px",
-              fontSize: "12px",
-              background: "#f8fafc",
           });
-          levelRow.appendChild(levelSelect);
-          box.appendChild(levelRow);
+          controls.appendChild(select);
 
-          // Buttons
-          const btnRow = document.createElement("div");
-          Object.assign(btnRow.style, {
-              display: "flex",
-              gap: "8px",
-              marginTop: "8px",
-          });
-
+          // Mock Execute
           const mockBtn = document.createElement("button");
           mockBtn.textContent = "Mock Execute";
           Object.assign(mockBtn.style, {
-              flex: "1",
-              padding: "6px",
+              padding: "8px",
               background: "#2f855a",
               color: "#fff",
-              border: "none",
               borderRadius: "6px",
-              cursor: "pointer",
+              border: "none",
+              cursor: "pointer"
           });
           mockBtn.onclick = () => {
               addMsg("assistant", "🔄 Running mock execution…");
-              setTimeout(() => {
-                  addMsg("assistant", "✅ Mock execution complete.\nTx: mock_tx_ABC123");
-              }, 600);
+              setTimeout(() => addMsg("assistant", "✅ Mock result (fake run)"), 900);
           };
+          controls.appendChild(mockBtn);
 
+          // Open Playground
           const playBtn = document.createElement("button");
           playBtn.textContent = "Open Playground";
           Object.assign(playBtn.style, {
-              flex: "1",
-              padding: "6px",
+              padding: "8px",
               background: "#3b82f6",
               color: "#fff",
-              border: "none",
               borderRadius: "6px",
-              cursor: "pointer",
+              border: "none",
+              cursor: "pointer"
           });
           playBtn.onclick = () => window.location.href = "/playground.html";
+          controls.appendChild(playBtn);
 
-          btnRow.appendChild(mockBtn);
-          btnRow.appendChild(playBtn);
-          box.appendChild(btnRow);
-
-          chatArea.appendChild(box);
+          container.appendChild(controls);
+          chatArea.appendChild(container);
           chatArea.scrollTop = chatArea.scrollHeight;
       };
 
