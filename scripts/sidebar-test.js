@@ -368,7 +368,11 @@
               }
 
               stepBox.appendChild(inner);
-              container.appendChild(stepBox);
+              const wrapper = document.createElement("div");
+              wrapper.className = "step-wrapper";
+              wrapper.style.marginBottom = "8px";
+              wrapper.appendChild(stepBox);
+              container.appendChild(wrapper);
           });
 
           // Execution Level + Buttons
@@ -380,20 +384,20 @@
               gap: "6px"
           });
 
-          // Level Dropdown
-          const select = document.createElement("select");
-          ["Mock", "Read-only", "Testnet", "Mainnet"].forEach(opt => {
-              const o = document.createElement("option");
-              o.value = opt.toLowerCase();
-              o.text = opt;
-              select.add(o);
-          });
-          Object.assign(select.style, {
-              border: "1px solid #cbd5e0",
-              padding: "6px",
-              borderRadius: "6px",
-          });
-          controls.appendChild(select);
+          // // Level Dropdown
+          // const select = document.createElement("select");
+          // ["Mock", "Read-only", "Testnet", "Mainnet"].forEach(opt => {
+          //     const o = document.createElement("option");
+          //     o.value = opt.toLowerCase();
+          //     o.text = opt;
+          //     select.add(o);
+          // });
+          // Object.assign(select.style, {
+          //     border: "1px solid #cbd5e0",
+          //     padding: "6px",
+          //     borderRadius: "6px",
+          // });
+          // controls.appendChild(select);
 
           // Mock Execute
           const mockBtn = document.createElement("button");
@@ -406,9 +410,77 @@
               border: "none",
               cursor: "pointer"
           });
-          mockBtn.onclick = () => {
-              addMsg("assistant", "🔄 Running mock execution…");
-              setTimeout(() => addMsg("assistant", "✅ Mock result (fake run)"), 900);
+          mockBtn.onclick = async () => {
+              // Assistant message
+              addMsg("assistant", "🔄 Sending workflow to backend…");
+
+              // ---- 1. POST the workflow array ----
+              let result;
+              try {
+                  const response = await fetch("https://api.thousandmonkeystypewriter.org/mock_execute", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ workflow: workflowArray })
+                  });
+
+                  if (!response.ok) {
+                      throw new Error("Backend mock execution failed with status " + response.status);
+                  }
+
+                  result = await response.json();
+              } catch (err) {
+                  console.error("[mockBtn] Request error:", err);
+                  addMsg("assistant", "❌ Mock execute failed: " + err.message);
+                  return;
+              }
+
+              // ---- 2. Validate format ----
+              if (!result || !Array.isArray(result.step_results)) {
+                  addMsg("assistant", "❌ Invalid mock response: missing step_results[]");
+                  return;
+              }
+
+              addMsg("assistant", "✅ Mock results received. Populating steps…");
+
+              // ---- 3. Insert each step result under its wrapper ----
+              const detailsNodes = container.querySelectorAll("details");
+
+              result.step_results.forEach((stepResult, idx) => {
+                  const detailsEl = detailsNodes[idx];
+                  if (!detailsEl) return;
+
+                  // The wrapper is the parent of <details>
+                  const wrapper = detailsEl.parentElement;
+
+                  // If wrapper is missing, abort
+                  if (!wrapper) return;
+
+                  // Remove previous mock output inside the wrapper
+                  let existing = wrapper.querySelector(".mock-output");
+                  if (existing) existing.remove();
+
+                  // Create new mock output block
+                  const outputEl = document.createElement("pre");
+                  outputEl.className = "mock-output";
+                  Object.assign(outputEl.style, {
+                      background: "#fefcbf",
+                      color: "#1a202c",
+                      padding: "6px",
+                      margin: "4px 0 6px 16px",
+                      borderRadius: "6px",
+                      fontSize: "11px",
+                      border: "1px solid #ecc94b",
+                      whiteSpace: "pre-wrap",
+                      overflowX: "auto",
+                  });
+
+                  outputEl.textContent = stepResult.output || stepResult.error || "No output from backend.";
+
+                  // Append AFTER <details>, so it remains visible even when collapsed
+                  wrapper.appendChild(outputEl);
+              });
+
+              addMsg("assistant", "📘 Mock execution complete. Outputs are visible under each step.");
           };
           controls.appendChild(mockBtn);
 

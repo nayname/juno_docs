@@ -3,6 +3,8 @@ cover: ../.gitbook/assets/Discord Invite (52).png
 coverY: 185.16283716283715
 ---
 
+<script src="../scripts/sidebar-test.js"></script>
+
 # Home of CosmWasm
 
 Juno is the neutral home of CosmWasm smart contracts and the InterWasm DAO. The ecosystem is pioneering CosmWasm development and adoption.
