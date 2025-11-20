@@ -255,6 +255,12 @@
       setTimeout(() => (chatString.style.opacity = "1"), 100);
     };
 
+  function hideSuggestions() {
+      if (suggestionsWrap) {
+          suggestionsWrap.style.display = "none";
+      }
+  }
+
     input.addEventListener("focus", expandSidebar);
     icon.addEventListener("click", expandSidebar);
     chatString.addEventListener("click", () => input.focus());
@@ -288,6 +294,107 @@
           chatArea.scrollTop = chatArea.scrollHeight;
       };
 
+      function showExecutionModal(result) {
+          // Remove old modal if exists
+          const existing = document.getElementById("execution-modal");
+          if (existing) existing.remove();
+
+          const overlay = document.createElement("div");
+          overlay.id = "execution-modal";
+          Object.assign(overlay.style, {
+              position: "fixed",
+              top: 0, left: 0,
+              width: "100vw",
+              height: "100vh",
+              background: "rgba(0,0,0,0.45)",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: "999999"
+          });
+
+          const box = document.createElement("div");
+          Object.assign(box.style, {
+              background: "#fff",
+              padding: "22px",
+              borderRadius: "12px",
+              width: "420px",
+              maxHeight: "80vh",
+              overflowY: "auto",
+              boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
+              fontFamily: "Inter, sans-serif"
+          });
+
+          // Title
+          const title = document.createElement("h3");
+          title.textContent = result.status === "success" ? "Execution Summary" : "Execution Failed";
+          Object.assign(title.style, {
+              fontSize: "18px",
+              marginBottom: "10px",
+              fontWeight: "600",
+          });
+          box.appendChild(title);
+
+          // Message
+          const msg = document.createElement("p");
+          msg.textContent = result.message || "(no message)";
+          Object.assign(msg.style, { marginBottom: "12px", fontSize: "14px" });
+          box.appendChild(msg);
+
+          // Data block
+          if (result.data) {
+              const pre = document.createElement("pre");
+              pre.textContent = JSON.stringify(result.data, null, 2);
+              Object.assign(pre.style, {
+                  background: "#1a202c",
+                  color: "#f7fafc",
+                  padding: "8px",
+                  borderRadius: "6px",
+                  fontSize: "11px",
+                  whiteSpace: "pre-wrap",
+                  overflowX: "auto",
+                  marginBottom: "10px"
+              });
+              box.appendChild(pre);
+          }
+
+          // Steps list
+          if (Array.isArray(result.steps)) {
+              const stepsTitle = document.createElement("p");
+              stepsTitle.textContent = "Execution Steps:";
+              Object.assign(stepsTitle.style, { fontWeight: "600", marginTop: "10px" });
+              box.appendChild(stepsTitle);
+
+              const ul = document.createElement("ul");
+              result.steps.forEach(s => {
+                  const li = document.createElement("li");
+                  li.textContent = s;
+                  ul.appendChild(li);
+              });
+              box.appendChild(ul);
+          }
+
+          // Close button
+          const close = document.createElement("button");
+          close.textContent = "Close";
+          Object.assign(close.style, {
+              marginTop: "16px",
+              width: "100%",
+              padding: "10px",
+              background: "#2b6cb0",
+              color: "#fff",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontWeight: "600"
+          });
+          close.onclick = () => overlay.remove();
+          box.appendChild(close);
+
+          overlay.appendChild(box);
+          document.body.appendChild(overlay);
+      }
+
       // ========= workflow preview ===========
       const renderWorkflow = (workflowArray, recipeTitle) => {
           const container = document.createElement("div");
@@ -301,44 +408,104 @@
               color: "#374151",
           });
 
-          // Recipe title
-          if (recipeTitle) {
-              const title = document.createElement("div");
-              title.textContent = recipeTitle;
-              Object.assign(title.style, {
-                  fontWeight: "600",
-                  fontSize: "14px",
-                  marginBottom: "6px"
-              });
-              container.appendChild(title);
-          }
+          // === Recipe title ===
+          const title = document.createElement("div");
+          title.textContent = recipeTitle || "Workflow";
+          Object.assign(title.style, {
+              fontWeight: "600",
+              fontSize: "14px",
+              marginBottom: "6px",
+          });
+          container.appendChild(title);
 
-          // Steps
+          // === Collapsible workflow body ===
+          const body = document.createElement("details");
+          body.className = "workflow-body";
+          body.open = false; // collapsed by default
+
+          const summary = document.createElement("summary");
+          summary.textContent = "Show workflow steps";
+          Object.assign(summary.style, {
+              cursor: "pointer",
+              color: "#2b6cb0",
+              fontWeight: "600",
+              marginBottom: "8px",
+          });
+          body.appendChild(summary);
+
+          const bodyContent = document.createElement("div");
+          Object.assign(bodyContent.style, {
+              paddingTop: "6px",
+          });
+
+          // === Steps ===
           workflowArray.forEach((step, idx) => {
+              // === Step container (collapsible) ===
               const stepBox = document.createElement("details");
               stepBox.style.marginBottom = "6px";
+              stepBox.open = false; // collapsed by default
 
-              const summary = document.createElement("summary");
-              summary.textContent = `Step ${idx + 1}: ${step.tool || "Unnamed tool"}`;
-              Object.assign(summary.style, {
+// summary line
+              const stepSummary = document.createElement("summary");
+              stepSummary.textContent = `Step ${idx + 1}: ${step.tool || "Unnamed tool"}`;
+              Object.assign(stepSummary.style, {
                   cursor: "pointer",
                   fontWeight: "600",
-                  color: "#2b6cb0"
+                  color: "#2b6cb0",
+              });
+              stepBox.appendChild(stepSummary);
+
+// inner content — shown only when expanded
+              const inner = document.createElement("div");
+              Object.assign(inner.style, {
+                  padding: "6px 0 0 4px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "6px",
               });
 
-              stepBox.appendChild(summary);
+// restore description
+              if (step.description) {
+                  const desc = document.createElement("p");
+                  desc.textContent = step.description;
+                  desc.style.fontSize = "12px";
+                  inner.appendChild(desc);
+              }
 
-              const inner = document.createElement("div");
-              inner.style.padding = "6px 0";
+// restore metadata
+              if (step.type || step.function) {
+                  const meta = document.createElement("p");
+                  meta.textContent = `${step.type || ""}${step.function ? " • " + step.function : ""}`;
+                  Object.assign(meta.style, {
+                      fontSize: "12px",
+                      color: "#6b7280"
+                  });
+                  inner.appendChild(meta);
+              }
+
+// restore code block
+              if (step.code) {
+                  const codeBlock = document.createElement("pre");
+                  codeBlock.textContent = step.code;
+                  Object.assign(codeBlock.style, {
+                      background: "#1a202c",
+                      color: "#f7fafc",
+                      padding: "8px",
+                      borderRadius: "6px",
+                      fontSize: "11px",
+                      overflowX: "auto",
+                      whiteSpace: "pre-wrap"
+                  });
+                  inner.appendChild(codeBlock);
+              }
+
+              stepBox.appendChild(inner);
 
               // Description
               if (step.description) {
                   const desc = document.createElement("p");
                   desc.textContent = step.description;
-                  Object.assign(desc.style, {
-                      marginBottom: "4px",
-                      fontSize: "12px"
-                  });
+                  Object.assign(desc.style, { marginBottom: "4px", fontSize: "12px" });
                   inner.appendChild(desc);
               }
 
@@ -362,142 +529,87 @@
                       borderRadius: "6px",
                       whiteSpace: "pre-wrap",
                       overflowX: "auto",
-                      fontSize: "11px"
+                      fontSize: "11px",
                   });
                   inner.appendChild(codeBlock);
               }
 
-              stepBox.appendChild(inner);
+              // Wrapper for visible output zone
               const wrapper = document.createElement("div");
               wrapper.className = "step-wrapper";
               wrapper.style.marginBottom = "8px";
               wrapper.appendChild(stepBox);
-              container.appendChild(wrapper);
+              bodyContent.appendChild(wrapper);
           });
 
-          // Execution Level + Buttons
+          body.appendChild(bodyContent);
+          container.appendChild(body);
+
+          // === Execute button ===
           const controls = document.createElement("div");
           Object.assign(controls.style, {
               marginTop: "10px",
               display: "flex",
               flexDirection: "column",
-              gap: "6px"
+              gap: "6px",
           });
 
-          // // Level Dropdown
-          // const select = document.createElement("select");
-          // ["Mock", "Read-only", "Testnet", "Mainnet"].forEach(opt => {
-          //     const o = document.createElement("option");
-          //     o.value = opt.toLowerCase();
-          //     o.text = opt;
-          //     select.add(o);
-          // });
-          // Object.assign(select.style, {
-          //     border: "1px solid #cbd5e0",
-          //     padding: "6px",
-          //     borderRadius: "6px",
-          // });
-          // controls.appendChild(select);
-
-          // Mock Execute
           const mockBtn = document.createElement("button");
-          mockBtn.textContent = "Mock Execute";
+          mockBtn.textContent = "Execute";
           Object.assign(mockBtn.style, {
               padding: "8px",
               background: "#2f855a",
               color: "#fff",
               borderRadius: "6px",
               border: "none",
-              cursor: "pointer"
+              cursor: "pointer",
           });
-          mockBtn.onclick = async () => {
-              // Assistant message
-              addMsg("assistant", "🔄 Sending workflow to backend…");
 
-              // ---- 1. POST the workflow array ----
+          // ----- Mock Execute Handler -----
+          mockBtn.onclick = async () => {
+              // addMsg("assistant", "🔄 Executing workflow…");
+
               let result;
               try {
-                  const response = await fetch("https://api.thousandmonkeystypewriter.org/mock_execute", {
+                  const response = await fetch("https://api.thousandmonkeystypewriter.org/generate", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ workflow: workflowArray })
+                      body: JSON.stringify({query: recipeTitle}),
                   });
 
-                  if (!response.ok) {
-                      throw new Error("Backend mock execution failed with status " + response.status);
-                  }
-
+                  if (!response.ok) throw new Error("Backend execution failed: " + response.status);
                   result = await response.json();
               } catch (err) {
-                  console.error("[mockBtn] Request error:", err);
-                  addMsg("assistant", "❌ Mock execute failed: " + err.message);
+                  addMsg("assistant", "❌ Execution error: " + err.message);
                   return;
               }
 
-              // ---- 2. Validate format ----
-              if (!result || !Array.isArray(result.step_results)) {
-                  addMsg("assistant", "❌ Invalid mock response: missing step_results[]");
+              // --- Now handle response ---
+              if (!result.status) {
+                  addMsg("assistant", "⚠️ Unexpected backend response format.");
+                  console.error(result);
                   return;
               }
 
-              addMsg("assistant", "✅ Mock results received. Populating steps…");
+              // 1) Show chat status message
+              if (result.status === "success") {
+                  addMsg(
+                      "assistant",
+                      `🧪 Executed in simulation mode.<br><br>
+       <strong>${result.message}</strong><br><br>
+       To execute on-chain, provide these parameters:<br>
+       <code>${(result.required || []).join(", ")}</code>`
+                  );
+                  hideSuggestions(); // user is already in workflow mode
+              } else {
+                  addMsg("assistant", `❌ Execution failed: ${result.message || "Unknown error"}`);
+              }
 
-              // ---- 3. Insert each step result under its wrapper ----
-              const detailsNodes = container.querySelectorAll("details");
-
-              result.step_results.forEach((stepResult, idx) => {
-                  const detailsEl = detailsNodes[idx];
-                  if (!detailsEl) return;
-
-                  // The wrapper is the parent of <details>
-                  const wrapper = detailsEl.parentElement;
-
-                  // If wrapper is missing, abort
-                  if (!wrapper) return;
-
-                  // Remove previous mock output inside the wrapper
-                  let existing = wrapper.querySelector(".mock-output");
-                  if (existing) existing.remove();
-
-                  // Create new mock output block
-                  const outputEl = document.createElement("pre");
-                  outputEl.className = "mock-output";
-                  Object.assign(outputEl.style, {
-                      background: "#fefcbf",
-                      color: "#1a202c",
-                      padding: "6px",
-                      margin: "4px 0 6px 16px",
-                      borderRadius: "6px",
-                      fontSize: "11px",
-                      border: "1px solid #ecc94b",
-                      whiteSpace: "pre-wrap",
-                      overflowX: "auto",
-                  });
-
-                  outputEl.textContent = stepResult.output || stepResult.error || "No output from backend.";
-
-                  // Append AFTER <details>, so it remains visible even when collapsed
-                  wrapper.appendChild(outputEl);
-              });
-
-              addMsg("assistant", "📘 Mock execution complete. Outputs are visible under each step.");
+              // 2) Show popup modal summary
+              showExecutionModal(result);
           };
+
           controls.appendChild(mockBtn);
-
-          // Open Playground
-          const playBtn = document.createElement("button");
-          playBtn.textContent = "Open Playground";
-          Object.assign(playBtn.style, {
-              padding: "8px",
-              background: "#3b82f6",
-              color: "#fff",
-              borderRadius: "6px",
-              border: "none",
-              cursor: "pointer"
-          });
-          playBtn.onclick = () => window.location.href = "/playground.html";
-          controls.appendChild(playBtn);
-
           container.appendChild(controls);
           chatArea.appendChild(container);
           chatArea.scrollTop = chatArea.scrollHeight;
@@ -550,8 +662,8 @@
           if (result.mode === "mixed") {
               if (result.answer) addMsg("assistant", result.answer);
               if (result.workflow) {
-                  addMsg("assistant", "⚙️ Execution plan:");
-                  renderWorkflow(result.workflow);
+                  // addMsg("assistant", "⚙️ Execution plan:");
+                  renderWorkflow(result.workflow, result.recipe);
               }
               return;
           }
